@@ -125,8 +125,6 @@ def main():
                               "audio_channels": audio_channels,
                               "subtitle_codec": subtitle_codec}
 
-        print()
-
     for file in file_list:
         print("Encoding {}...".format(file))
         # If the encodes proceed too slowly, erase "-preset:v veryslow"
