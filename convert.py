@@ -6,7 +6,7 @@ simply invoke it from the directory containing the files you wish to encode.
 The outputs will be created in a subdirectory called 'hardsubbed'.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import os
 from subprocess import run
