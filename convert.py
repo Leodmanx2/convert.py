@@ -27,20 +27,20 @@ def get_audio_flags(codec, channels, index):
                 "-map", "0:a:{}".format(index)]
     return []
 
-def get_filter_flags(codec, index):
+def get_filter_flags(codec, index, subfile):
     # Hard-subbing picture-based subtitles requires a different filter from
     # text-based subtitles
     if codec in ("dvd_subtitle", "hdmv_pgs_subtitle"):
         subfilter = "[0:v][0:s:{}]overlay[burned];".format(index)
     elif codec != "none":
-        subfilter = "[0:v]subtitles=ENCODING:si={}[burned];".format(index)
+        subfilter = "[0:v]subtitles='{}':si={}[burned];".format(subfile, index)
     else:
         subfilter = "[0:v]null[burned];"
-    return ["-filter_complex", "{}[burned]scale=-16:'min(720,ih)'[v]".format(subfilter),
+    return ["-filter_complex", "{}[burned]scale=-16:min(720\\,ih)[v]".format(subfilter),
             "-map", "[v]"]
 
 def get_key(file):
-    match = re.match("\[(.+)\] (.+) - (\d+) .*", file)
+    match = re.match(r"\[(.+)\] (.+) - (\d+) .*", file)
     return match.group(2) if match else file
 
 def print_stream_info(streams):
@@ -149,18 +149,13 @@ def main():
         # TODO: Search for sub file if not embedded
         subtitle_codec = track_info["subtitle_codec"]
         subtitle_index = track_info["subtitle_index"]
-        filter_flags = get_filter_flags(subtitle_codec, subtitle_index)
+        filter_flags = get_filter_flags(subtitle_codec, subtitle_index, file)
 
-        # We rename the file to something safe because attempting to escape
-        # arbitrary filenames inevitably leads to errors. ffmpeg filter strings
-        # have to be escaped three times, with the last in a shell-specific way.
         try:
-            os.rename(file, "ENCODING")
-
             encode_results = run(["ffmpeg", "-hide_banner",
                                   "-loglevel", "warning",
                                   "-stats",
-                                  "-i", "ENCODING"] +
+                                  "-i", "{}".format(file)] +
                                  video_flags +
                                  audio_flags +
                                  filter_flags +
@@ -172,8 +167,6 @@ def main():
             print(error, file=sys.stderr)
             print("skipping file\n", file=sys.stderr)
             continue
-        finally:
-            os.rename("ENCODING", file)
 
 if __name__ == "__main__":
     main()
