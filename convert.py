@@ -6,7 +6,7 @@ simply invoke it from the directory containing the files you wish to encode.
 The outputs will be created in a subdirectory called 'hardsubbed'.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 import os
 from subprocess import run
@@ -27,13 +27,13 @@ def get_audio_flags(codec, channels, index):
                 "-map", "0:a:{}".format(index)]
     return []
 
-def get_filter_flags(codec, index, subfile):
+def get_filter_flags(codec, index):
     # Hard-subbing picture-based subtitles requires a different filter from
     # text-based subtitles
     if codec in ("dvd_subtitle", "hdmv_pgs_subtitle"):
         subfilter = "[0:v][0:s:{}]overlay[burned];".format(index)
     elif codec != "none":
-        subfilter = "[0:v]subtitles='{}':si={}[burned];".format(subfile, index)
+        subfilter = "[0:v]subtitles=ENCODING:si={}[burned];".format(index)
     else:
         subfilter = "[0:v]null[burned];"
     return ["-filter_complex", "{}[burned]scale=-16:min(720\\,ih)[v]".format(subfilter),
@@ -126,6 +126,15 @@ def main():
                               "subtitle_codec": subtitle_codec}
 
     for file in file_list:
+        # Create a hard link to the file named "ENCODING", which can be safely 
+        # used in filter strings without worrying about special characters in
+        # the file name.
+        try:
+            os.remove("ENCODING")
+        except OSError:
+            pass
+        os.link(file, "ENCODING")
+
         print("Encoding {}...".format(file))
         # If the encodes proceed too slowly, erase "-preset:v veryslow"
         # or choose a suitable preset like 'fast'.
@@ -149,13 +158,13 @@ def main():
         # TODO: Search for sub file if not embedded
         subtitle_codec = track_info["subtitle_codec"]
         subtitle_index = track_info["subtitle_index"]
-        filter_flags = get_filter_flags(subtitle_codec, subtitle_index, file)
+        filter_flags = get_filter_flags(subtitle_codec, subtitle_index)
 
         try:
             encode_results = run(["ffmpeg", "-hide_banner",
                                   "-loglevel", "warning",
                                   "-stats",
-                                  "-i", "{}".format(file)] +
+                                  "-i", file] +
                                  video_flags +
                                  audio_flags +
                                  filter_flags +
@@ -167,6 +176,8 @@ def main():
             print(error, file=sys.stderr)
             print("skipping file\n", file=sys.stderr)
             continue
+        finally:
+            os.remove("ENCODING")
 
 if __name__ == "__main__":
     main()
